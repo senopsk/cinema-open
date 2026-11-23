@@ -41,13 +41,13 @@
   "use strict";
   var APPS = {
     cgv: { name: "CGV", pkg: "co.kr.cgv.cjcgv", scheme: "", path: "", ios: "", deep: "",
-           prefix: "https://cgv.co.kr/cnm/", home: "https://cgv.co.kr/cnm/movieBook/cinema" },
+           prefixes: ["https://cgv.co.kr/cnm/"], home: "https://cgv.co.kr/cnm/movieBook/cinema" },
     megabox: { name: "메가박스", pkg: "com.megabox.mop", scheme: "megaboxapp", path: "/main", ios: "megaboxapp://main", deep: "path",
-               prefix: "https://m.megabox.co.kr/", home: "https://m.megabox.co.kr/booking" },
+               prefixes: ["https://m.megabox.co.kr/"], home: "https://m.megabox.co.kr/booking" },
     lottecinema: { name: "롯데시네마", pkg: "kr.co.lottecinema.lcm", scheme: "lottecinema-lcm", path: "lcm", ios: "lottecinema-lcm://lcm", deep: "link",
-                   prefix: "https://www.lottecinema.co.kr/NLCMW/", home: "https://www.lottecinema.co.kr/NLCMW/Ticketing" },
-    cineq: { name: "씨네Q", pkg: "kr.co.cineq.app.android", scheme: "", path: "", ios: "", deep: "",
-             prefix: "https://www.cineq.co.kr/", home: "https://www.cineq.co.kr/" }
+                   prefixes: ["https://www.lottecinema.co.kr/NLCMW/"], home: "https://www.lottecinema.co.kr/NLCMW/Ticketing" },
+    cineq: { name: "씨네Q", pkg: "kr.co.cineq.app.android", scheme: "", path: "", ios: "", deep: "https",
+             prefixes: ["https://www.cineq.co.kr/", "https://m.cineq.co.kr/"], home: "https://www.cineq.co.kr/" }
   };
   var params = new URLSearchParams(location.hash.slice(1));
   var chain = params.get("c") || "";
@@ -63,10 +63,12 @@
   }
 
   function safeWeb(value) {
-    if (!value || value.indexOf(app.prefix) !== 0 || /[\s"'<>\\]/.test(value)) return app.home;
+    var prefix = "";
+    for (var i = 0; i < app.prefixes.length; i++) { if (value && value.indexOf(app.prefixes[i]) === 0) prefix = app.prefixes[i]; }
+    if (!prefix || /[\s"'<>\\]/.test(value)) return app.home;
     try {
       var url = new URL(value);
-      return url.protocol === "https:" && url.origin === new URL(app.prefix).origin ? url.href : app.home;
+      return url.protocol === "https:" && url.origin === new URL(prefix).origin ? url.href : app.home;
     } catch (e) {
       return app.home;
     }
@@ -86,11 +88,16 @@
   } else if (web !== app.home && app.deep === "link") {
     path = app.path + "?link=" + encodeURIComponent(web);
   }
+  // CineQ: the app and the mobile web share one "share URI" handler (?movieCode=&theaterCode=), so hand
+  // the same https link to the app package; Chrome falls back to the web link when the app cannot take it.
+  var shareLink = app.deep === "https" && web.indexOf("https://m.") === 0 ? new URL(web) : null;
   var appUrl = "";
-  if (android) {
-    appUrl = app.scheme
-      ? "intent://" + path + "#Intent;scheme=" + app.scheme + ";package=" + app.pkg + ";S.browser_fallback_url=" + fallback + ";end"
-      : "intent://details?id=" + app.pkg + "#Intent;scheme=market;package=com.android.vending;S.browser_fallback_url=" + fallback + ";end";
+  if (android && app.scheme) {
+    appUrl = "intent://" + path + "#Intent;scheme=" + app.scheme + ";package=" + app.pkg + ";S.browser_fallback_url=" + fallback + ";end";
+  } else if (android && shareLink) {
+    appUrl = "intent://" + shareLink.host + shareLink.pathname + shareLink.search + "#Intent;scheme=https;package=" + app.pkg + ";S.browser_fallback_url=" + fallback + ";end";
+  } else if (android) {
+    appUrl = "intent://details?id=" + app.pkg + "#Intent;scheme=market;package=com.android.vending;S.browser_fallback_url=" + fallback + ";end";
   } else if (ios && app.ios) {
     appUrl = app.scheme + "://" + path;
   }
@@ -106,7 +113,7 @@
     return;
   }
   title.textContent = app.name + " 앱 여는 중…";
-  if (!app.scheme) {
+  if (!app.scheme && !shareLink) {
     note.textContent = "Play 스토어의 " + app.name + " 화면에서 「열기」를 누르면 앱이 실행됩니다. 앱이 없으면 웹 예매를 이용해 주세요.";
   }
   openBtn.href = appUrl;
