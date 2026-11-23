@@ -46,7 +46,7 @@
                prefixes: ["https://m.megabox.co.kr/"], home: "https://m.megabox.co.kr/booking" },
     lottecinema: { name: "롯데시네마", pkg: "kr.co.lottecinema.lcm", scheme: "lottecinema-lcm", path: "lcm", ios: "lottecinema-lcm://lcm", deep: "link",
                    prefixes: ["https://www.lottecinema.co.kr/NLCMW/"], home: "https://www.lottecinema.co.kr/NLCMW/Ticketing" },
-    cineq: { name: "씨네Q", pkg: "kr.co.cineq.app.android", scheme: "", path: "", ios: "", deep: "https",
+    cineq: { name: "씨네Q", pkg: "kr.co.cineq.app.android", scheme: "", path: "", ios: "", deep: "",
              prefixes: ["https://www.cineq.co.kr/", "https://m.cineq.co.kr/"], home: "https://www.cineq.co.kr/" }
   };
   var params = new URLSearchParams(location.hash.slice(1));
@@ -88,14 +88,11 @@
   } else if (web !== app.home && app.deep === "link") {
     path = app.path + "?link=" + encodeURIComponent(web);
   }
-  // CineQ: the app and the mobile web share one "share URI" handler (?movieCode=&theaterCode=), so hand
-  // the same https link to the app package; Chrome falls back to the web link when the app cannot take it.
-  var shareLink = app.deep === "https" && web.indexOf("https://m.") === 0 ? new URL(web) : null;
+  // No public app scheme (CineQ): go through the Play Store details screen ("열기" when installed).
+  // The CineQ app did not accept its share link as an https intent (S23, 2026-11-24).
   var appUrl = "";
   if (android && app.scheme) {
     appUrl = "intent://" + path + "#Intent;scheme=" + app.scheme + ";package=" + app.pkg + ";S.browser_fallback_url=" + fallback + ";end";
-  } else if (android && shareLink) {
-    appUrl = "intent://" + shareLink.host + shareLink.pathname + shareLink.search + "#Intent;scheme=https;package=" + app.pkg + ";S.browser_fallback_url=" + fallback + ";end";
   } else if (android) {
     appUrl = "intent://details?id=" + app.pkg + "#Intent;scheme=market;package=com.android.vending;S.browser_fallback_url=" + fallback + ";end";
   } else if (ios && app.ios) {
@@ -113,7 +110,7 @@
     return;
   }
   title.textContent = app.name + " 앱 여는 중…";
-  if (!app.scheme && !shareLink) {
+  if (!app.scheme) {
     note.textContent = "Play 스토어의 " + app.name + " 화면에서 「열기」를 누르면 앱이 실행됩니다. 앱이 없으면 웹 예매를 이용해 주세요.";
   }
   openBtn.href = appUrl;
