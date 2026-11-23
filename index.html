@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>영화관 앱 열기</title>
+<!--
+  cinema-booking-alert 정본: deploy/app-open/index.html (공개 저장소에는 이 파일만 복사).
+  파라미터는 URL 조각(#c=<체인>&w=<공식 웹 URL>)으로만 받아 서버로 전송되지 않습니다.
+  외부 스크립트·폰트·분석 도구 없음. 이동 대상은 아래 APPS 표의 공식 주소로 제한합니다.
+-->
+<style>
+  :root { --bg: #f6f7f9; --card: #ffffff; --text: #16181d; --muted: #5b6170; --primary: #2563eb; --on-primary: #ffffff; --line: #d9dde5; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111318; --card: #1b1e25; --text: #eceef3; --muted: #a3a9b7; --primary: #5b8cff; --on-primary: #0b0d12; --line: #2c313b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+         background: var(--bg); color: var(--text); font: 16px/1.5 -apple-system, "Segoe UI", "Noto Sans KR", sans-serif; padding: 16px; }
+  main { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px 20px; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+  a.btn { display: block; text-align: center; text-decoration: none; padding: 14px 12px; border-radius: 12px; font-weight: 600; margin-top: 10px; }
+  a.primary { background: var(--primary); color: var(--on-primary); }
+  a.secondary { border: 1px solid var(--line); color: var(--text); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">영화관 앱 여는 중…</h1>
+  <p id="note">앱이 열리지 않으면 아래 버튼을 눌러 주세요.</p>
+  <a id="open" class="btn primary" href="#" hidden>앱 열기</a>
+  <a id="web" class="btn secondary" href="#" hidden>웹으로 예매</a>
+</main>
+<script>
+(function () {
+  "use strict";
+  var APPS = {
+    cgv: { name: "CGV", pkg: "com.cgv.android.movieapp", scheme: "", path: "", ios: "",
+           prefix: "https://cgv.co.kr/cnm/", home: "https://cgv.co.kr/cnm/movieBook/cinema" },
+    megabox: { name: "메가박스", pkg: "com.megabox.mop", scheme: "megaboxapp", path: "/main", ios: "megaboxapp://main",
+               prefix: "https://m.megabox.co.kr/", home: "https://m.megabox.co.kr/booking" },
+    lottecinema: { name: "롯데시네마", pkg: "kr.co.lottecinema.lcm", scheme: "lottecinema-lcm", path: "lcm", ios: "lottecinema-lcm://lcm",
+                   prefix: "https://www.lottecinema.co.kr/NLCMW/", home: "https://www.lottecinema.co.kr/NLCMW/Ticketing" },
+    cineq: { name: "씨네Q", pkg: "kr.co.cineq.app.android", scheme: "", path: "", ios: "",
+             prefix: "https://www.cineq.co.kr/", home: "https://www.cineq.co.kr/" }
+  };
+  var params = new URLSearchParams(location.hash.slice(1));
+  var chain = params.get("c") || "";
+  var app = Object.prototype.hasOwnProperty.call(APPS, chain) ? APPS[chain] : null;
+  var title = document.getElementById("title");
+  var note = document.getElementById("note");
+  var openBtn = document.getElementById("open");
+  var webBtn = document.getElementById("web");
+  if (!app) {
+    title.textContent = "알 수 없는 링크입니다";
+    note.textContent = "Telegram 알림의 버튼에서 다시 열어 주세요.";
+    return;
+  }
+
+  function safeWeb(value) {
+    if (!value || value.indexOf(app.prefix) !== 0 || /[\s"'<>\\]/.test(value)) return app.home;
+    try {
+      var url = new URL(value);
+      return url.protocol === "https:" && url.origin === new URL(app.prefix).origin ? url.href : app.home;
+    } catch (e) {
+      return app.home;
+    }
+  }
+
+  var web = safeWeb(params.get("w"));
+  var ua = navigator.userAgent || "";
+  var android = /Android/i.test(ua);
+  var ios = /iPhone|iPad|iPod/i.test(ua);
+  var fallback = encodeURIComponent(web);
+  var appUrl = "";
+  if (android) {
+    appUrl = app.scheme
+      ? "intent://" + app.path + "#Intent;scheme=" + app.scheme + ";package=" + app.pkg + ";S.browser_fallback_url=" + fallback + ";end"
+      : "intent://details?id=" + app.pkg + "#Intent;scheme=market;package=com.android.vending;S.browser_fallback_url=" + fallback + ";end";
+  } else if (ios && app.ios) {
+    appUrl = app.ios;
+  }
+
+  document.title = app.name + " 앱 열기";
+  webBtn.href = web;
+  webBtn.textContent = app.name + " 웹으로 예매";
+  webBtn.hidden = false;
+  if (!appUrl) {
+    title.textContent = app.name + " 웹 예매로 이동합니다";
+    note.textContent = "이 기기에서는 앱 바로 열기를 지원하지 않아 공식 웹 예매로 이동합니다.";
+    location.replace(web);
+    return;
+  }
+  title.textContent = app.name + " 앱 여는 중…";
+  if (!app.scheme) {
+    note.textContent = "Play 스토어의 " + app.name + " 화면에서 「열기」를 누르면 앱이 실행됩니다. 앱이 없으면 웹 예매를 이용해 주세요.";
+  }
+  openBtn.href = appUrl;
+  openBtn.textContent = app.name + " 앱 열기";
+  openBtn.hidden = false;
+  // One automatic attempt only; a page restored from the back/forward cache does not re-run this.
+  setTimeout(function () { if (!document.hidden) location.href = appUrl; }, 60);
+})();
+</script>
+</body>
+</html>
